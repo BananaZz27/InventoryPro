@@ -29,6 +29,19 @@ export default function Home() {
     { refreshInterval: 3000 }
   )
 
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  const filteredItems = items?.filter((item: any) => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    item.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const filteredRequests = requests?.filter((req: any) => 
+    statusFilter === 'ALL' ? true : req.status === statusFilter
+  )
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
