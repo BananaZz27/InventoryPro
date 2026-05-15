@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
-import { LogIn, Package, User, Check, X, ClipboardList, LogOut, Plus, Trash2, Edit3, RotateCcw } from 'lucide-react'
+import { LogIn, Package, User, Check, X, ClipboardList, LogOut, Plus, Trash2, Edit3, RotateCcw, Search, Filter } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function Home() {
+  // --- State Declarations ---
   const [user, setUser] = useState<any>(null)
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('password123')
@@ -17,49 +18,57 @@ export default function Home() {
   const [editingItem, setEditingItem] = useState<any>(null)
   const [itemForm, setItemForm] = useState({ name: '', description: '', quantity: 0 })
 
-  // SWR for items
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  // --- Data Fetching ---
   const { data: items, mutate: mutateItems } = useSWR('/api/items', fetcher, {
     refreshInterval: 3000,
   })
 
-  // SWR for borrow requests
   const { data: requests, mutate: mutateRequests } = useSWR(
     user ? `/api/borrow?userId=${user.id}&role=${user.role}` : null,
     fetcher,
     { refreshInterval: 3000 }
   )
 
-  // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
-
-  const filteredItems = items?.filter((item: any) => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    item.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // --- Derived State (Filtering) ---
+  const filteredItems = items?.filter((item: any) => {
+    const searchLower = searchTerm.toLowerCase()
+    return item.name.toLowerCase().includes(searchLower) || 
+           (item.description && item.description.toLowerCase().includes(searchLower))
+  })
 
   const filteredRequests = requests?.filter((req: any) => 
     statusFilter === 'ALL' ? true : req.status === statusFilter
   )
 
+  // --- Event Handlers ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-      headers: { 'Content-Type': 'application/json' },
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setUser(data)
-    } else {
-      setError(data.error)
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setUser(data)
+      } else {
+        setError(data.error || 'Login failed')
+      }
+    } catch (err) {
+      setError('Connection error')
     }
   }
 
   const handleLogout = () => {
     setUser(null)
+    setSearchTerm('')
+    setStatusFilter('ALL')
   }
 
   const handleSaveItem = async (e: React.FormEvent) => {
@@ -110,6 +119,7 @@ export default function Home() {
     }
   }
 
+  // --- Render Login Page ---
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
@@ -176,6 +186,7 @@ export default function Home() {
     )
   }
 
+  // --- Render Dashboard ---
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Navbar */}
@@ -210,6 +221,7 @@ export default function Home() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+          
           {/* Items Section */}
           <div className="lg:col-span-7 space-y-6">
             <div className="flex items-center justify-between">
@@ -232,15 +244,23 @@ export default function Home() {
             </div>
 
             {/* Search Bar */}
-            <div className="relative">
+            <div className="relative group">
               <input
                 type="text"
                 placeholder="ค้นหาสินค้า..."
-                className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 pl-12 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 pl-12 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all group-hover:border-slate-300"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <Package className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 text-slate-400"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             
             <div className="grid gap-4">
@@ -298,21 +318,46 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+              
+              {filteredItems?.length === 0 && (
+                <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-300">
+                  <Package className="mx-auto h-12 w-12 text-slate-300" />
+                  <p className="mt-4 text-slate-500 font-bold">ไม่พบสินค้าที่คุณค้นหา</p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Requests Section */}
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl">
-              <h3 className="text-xl font-black mb-1">
-                {user.role === 'ADMIN' ? 'จัดการคำขอ' : 'ประวัติการยืม'}
-              </h3>
-              <p className="text-slate-400 text-sm font-medium">
-                {user.role === 'ADMIN' ? 'อนุมัติหรือปฏิเสธคำขอจากผู้ใช้งาน' : 'ตรวจสอบสถานะรายการที่คุณส่งคำขอ'}
-              </p>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-black mb-1">
+                    {user.role === 'ADMIN' ? 'จัดการคำขอ' : 'ประวัติการยืม'}
+                  </h3>
+                  <p className="text-slate-400 text-xs font-medium">
+                    {user.role === 'ADMIN' ? 'อนุมัติหรือปฏิเสธคำขอ' : 'ตรวจสอบสถานะรายการ'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-xl border border-slate-700">
+                  <Filter className="h-3.5 w-3.5 text-slate-500 ml-2" />
+                  <select 
+                    className="bg-transparent text-[10px] font-bold rounded-lg border-none focus:ring-0 cursor-pointer text-slate-300 pr-8"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="ALL">ทั้งหมด</option>
+                    <option value="PENDING">รอดำเนินการ</option>
+                    <option value="APPROVED">อนุมัติแล้ว</option>
+                    <option value="RETURNED">คืนแล้ว</option>
+                    <option value="REJECTED">ปฏิเสธ</option>
+                  </select>
+                </div>
+              </div>
               
-              <div className="mt-6 space-y-4">
-                {requests?.map((req: any) => (
+              <div className="space-y-4">
+                {filteredRequests?.map((req: any) => (
                   <div key={req.id} className="bg-slate-800/50 backdrop-blur rounded-2xl p-4 border border-slate-700/50 transition-colors hover:bg-slate-800">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -375,10 +420,10 @@ export default function Home() {
                   </div>
                 ))}
                 
-                {(!requests || requests.length === 0) && (
+                {(!filteredRequests || filteredRequests.length === 0) && (
                   <div className="py-12 text-center">
                     <ClipboardList className="mx-auto h-12 w-12 text-slate-700" />
-                    <p className="mt-3 text-slate-500 font-bold text-sm">ไม่มีรายการคำขอยืม</p>
+                    <p className="mt-3 text-slate-500 font-bold text-sm">ไม่มีรายการที่ตรงเงื่อนไข</p>
                   </div>
                 )}
               </div>
