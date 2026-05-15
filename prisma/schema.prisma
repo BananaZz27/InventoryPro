@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  username       String          @unique
+  password       String
+  role           String // "ADMIN" หรือ "BORROWER"
+  borrowRequests BorrowRequest[]
+}
+
+model Item {
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  quantity       Int             @default(0)
+  borrowRequests BorrowRequest[]
+}
+
+model BorrowRequest {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  itemId     String
+  item       Item      @relation(fields: [itemId], references: [id])
+  quantity   Int
+  status     String    @default("PENDING") // "PENDING", "APPROVED", "REJECTED", "RETURNED"
+  returnedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
